@@ -1,4 +1,4 @@
-FROM ruby:3.3.0
+FROM 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sreee-buggyapp-base:latest
 
 WORKDIR /app
 
