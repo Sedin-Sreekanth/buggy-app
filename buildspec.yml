@@ -55,3 +55,4 @@ phases:
           --cluster sree-cluster \
           --service sree-service \
           --task-definition "$NEW_TASK_DEF_ARN"
+          --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200"
