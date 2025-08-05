@@ -21,30 +21,42 @@ phases:
 
   pre_build:
     commands:
-      - echo Getting Git commit hash...
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - echo "IMAGE_TAG=$IMAGE_TAG"
-      - IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+      - |
+        echo Getting Git commit hash...
+        IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+        echo "IMAGE_TAG=$IMAGE_TAG"
+        IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+        echo "IMAGE_URI=$IMAGE_URI" > image_env.txt
 
   build:
     commands:
-      - echo Building Docker image...
-      - docker build -t $IMAGE_URI .
-      - docker push $IMAGE_URI
-      - echo Writing new task definition...
-      - sed "s|IMAGE_URI|$IMAGE_URI|g" $TASK_DEF_TEMPLATE > $TASK_DEF_FILE
+      - |
+        echo Loading image environment variables...
+        source image_env.txt
+        echo Building Docker image...
+        docker build -t $IMAGE_URI .
+        docker push $IMAGE_URI
+        echo Writing new task definition...
+        sed "s|IMAGE_URI|$IMAGE_URI|g" $TASK_DEF_TEMPLATE > $TASK_DEF_FILE
 
   post_build:
     commands:
-      - echo Registering new task definition...
-      - NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://$TASK_DEF_FILE --query 'taskDefinition.taskDefinitionArn' --output text)
-      - echo "New task definition registered: $NEW_TASK_DEF_ARN"
-      - if [ -z "$NEW_TASK_DEF_ARN" ]; then echo "❌ Failed to register task definition"; exit 1; fi
-      - echo Updating ECS service...
-      - aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --task-definition "$NEW_TASK_DEF_ARN" --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200" --health-check-grace-period-seconds 90
-      - echo "[{\"name\":\"$CONTAINER_NAME\",\"imageUri\":\"$IMAGE_URI\"}]" > imagedefinitions.json
+      - |
+        echo Loading image environment variables...
+        source image_env.txt
+        echo Registering new task definition...
+        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://$TASK_DEF_FILE --query 'taskDefinition.taskDefinitionArn' --output text)
+        echo "New task definition registered: $NEW_TASK_DEF_ARN"
+        if [ -z "$NEW_TASK_DEF_ARN" ]; then echo "❌ Failed to register task definition"; exit 1; fi
+        echo Updating ECS service...
+        aws ecs update-service \
+          --cluster $CLUSTER_NAME \
+          --service $SERVICE_NAME \
+          --task-definition "$NEW_TASK_DEF_ARN" \
+          --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200" \
+          --health-check-grace-period-seconds 90
+        echo "[{\"name\":\"$CONTAINER_NAME\",\"imageUri\":\"$IMAGE_URI\"}]" > imagedefinitions.json
 
 artifacts:
   files:
     - imagedefinitions.json
-
