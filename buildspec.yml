@@ -37,10 +37,7 @@ phases:
   post_build:
     commands:
       - echo Registering new task definition...
-      - NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-          --cli-input-json file://$TASK_DEF_FILE \
-          --query 'taskDefinition.taskDefinitionArn' \
-          --output text)
+      - NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://$TASK_DEF_FILE --query 'taskDefinition.taskDefinitionArn' --output text)
       - echo "New task definition registered: $NEW_TASK_DEF_ARN"
       - '[ -z "$NEW_TASK_DEF_ARN" ] && echo "❌ Failed to register task definition" && exit 1'
       - echo Updating ECS service...
