@@ -59,7 +59,7 @@ phases:
           --cluster sree-cluster \
           --service sree-service \
           --task-definition "$NEW_TASK_DEF_ARN"
-
+          --force-new-deployment
 artifacts:
   files:
     - new-task-def.json
