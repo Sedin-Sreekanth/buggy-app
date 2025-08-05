@@ -51,8 +51,4 @@ phases:
           --output text)
         echo "New task definition registered: $NEW_TASK_DEF_ARN"
         echo "Updating ECS service..."
-        aws ecs update-service \
-          --cluster sree-cluster \
-          --service sree-service \
-          --task-definition "$NEW_TASK_DEF_ARN"
-          --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200"
+        aws ecs update-service --cluster sree-cluster --service sree-service --task-definition "$NEW_TASK_DEF_ARN" --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200"
