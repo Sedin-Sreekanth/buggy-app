@@ -1,62 +1,65 @@
 version: 0.2
 
-env:
-  variables:
-    IMAGE_REPO_NAME: "sree-buggy"
-    CLUSTER_NAME: "sree-cluster"
-    SERVICE_NAME: "sree-service"
-    TASK_DEF_TEMPLATE: "taskdef-template.json"
-    TASK_DEF_FILE: "new-task-def.json"
-    CONTAINER_NAME: "exp-code-pipeline"
-    AWS_REGION: "ap-south-1"
-    ACCOUNT_ID: "156916773321"
-
 phases:
   install:
-    runtime-versions:
-      docker: 20
     commands:
-      - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.$AWS_REGION.amazonaws.com
+      - echo "🔧 Installing dependencies..."
+      - apt-get update && apt-get install -y jq
 
   pre_build:
     commands:
-      - |
-        echo Getting Git commit hash...
-        IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-        echo "IMAGE_TAG=$IMAGE_TAG"
-        IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}"
-        echo "IMAGE_URI=$IMAGE_URI" > image_env.txt
+      - echo "🔐 Logging into Amazon ECR..."
+      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 156916773321.dkr.ecr.ap-south-1.amazonaws.com
 
   build:
     commands:
-      - |
-        echo Loading image environment variables...
-        source image_env.txt
-        echo Building Docker image...
-        docker build -t $IMAGE_URI .
-        docker push $IMAGE_URI
-        echo Writing new task definition...
-        sed "s|IMAGE_URI|$IMAGE_URI|g" $TASK_DEF_TEMPLATE > $TASK_DEF_FILE
+      - echo "🐳 Building final Docker image..."
+      - docker build -t 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest .
 
   post_build:
     commands:
+      - echo "📤 Pushing Docker image to ECR..."
+      - docker push 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest
+      - echo "✅ Docker image pushed to ECR successfully!"
+
+      - echo "📄 Describing current task definition..."
+      - aws ecs describe-task-definition --task-definition sree-ci-cd > current-task-def.json
+
+      - echo "✏️ Modifying container image in task definition..."
       - |
-        echo Loading image environment variables...
-        source image_env.txt
-        echo Registering new task definition...
-        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://$TASK_DEF_FILE --query 'taskDefinition.taskDefinitionArn' --output text)
-        echo "New task definition registered: $NEW_TASK_DEF_ARN"
-        if [ -z "$NEW_TASK_DEF_ARN" ]; then echo "❌ Failed to register task definition"; exit 1; fi
-        echo Updating ECS service...
+        cat current-task-def.json | jq '.taskDefinition | {
+          family: .family,
+          containerDefinitions: [.containerDefinitions[] |
+            if .name == "sree-ci-cd-container" then
+              .image = "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest"
+            else . end],
+          executionRoleArn: .executionRoleArn,
+          taskRoleArn: .taskRoleArn,
+          networkMode: .networkMode,
+          requiresCompatibilities: .requiresCompatibilities,
+          cpu: .cpu,
+          memory: .memory
+        }' > new-task-def.json
+
+      - echo "🆕 New task definition JSON:"
+      - cat new-task-def.json
+
+      - echo "📝 Registering new task definition revision..."
+      - |
+        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://new-task-def.json \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+
+        echo "✅ New task definition registered: $NEW_TASK_DEF_ARN"
+
+      - echo "🔄 Updating ECS service..."
+      - |
         aws ecs update-service \
-          --cluster $CLUSTER_NAME \
-          --service $SERVICE_NAME \
-          --task-definition "$NEW_TASK_DEF_ARN" \
-          --deployment-configuration "minimumHealthyPercent=100,maximumPercent=200" \
-          --health-check-grace-period-seconds 90
-        echo "[{\"name\":\"$CONTAINER_NAME\",\"imageUri\":\"$IMAGE_URI\"}]" > imagedefinitions.json
+          --cluster sree-cluster \
+          --service sree-service \
+          --task-definition "$NEW_TASK_DEF_ARN"
 
 artifacts:
   files:
-    - imagedefinitions.json
+    - new-task-def.json
