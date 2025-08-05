@@ -1,65 +1,38 @@
 version: 0.2
 
 phases:
-  install:
-    commands:
-      - echo "🔧 Installing dependencies..."
-      - apt-get update && apt-get install -y jq
-
   pre_build:
     commands:
-      - echo "🔐 Logging into Amazon ECR..."
+      - echo Logging into ECR...
       - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 156916773321.dkr.ecr.ap-south-1.amazonaws.com
 
   build:
     commands:
-      - echo "🐳 Building final Docker image..."
+      - echo Building Docker image...
       - docker build -t 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest .
+      - echo Docker image built.
 
   post_build:
     commands:
-      - echo "📤 Pushing Docker image to ECR..."
+      - echo Pushing image to ECR...
       - docker push 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest
-      - echo "✅ Docker image pushed to ECR successfully!"
 
-      - echo "📄 Describing current task definition..."
-      - aws ecs describe-task-definition --task-definition sree-ci-cd > current-task-def.json
+      - echo Fetching latest task definition revision...
+      - TASK_FAMILY="sree-ci-cd"
+      - aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --region ap-south-1 --query "taskDefinition" --output json > old-task-def.json
 
-      - echo "✏️ Modifying container image in task definition..."
-      - |
-        cat current-task-def.json | jq '.taskDefinition | {
-          family: .family,
-          containerDefinitions: [.containerDefinitions[] |
-            if .name == "sree-ci-cd-container" then
-              .image = "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest"
-            else . end],
-          executionRoleArn: .executionRoleArn,
-          taskRoleArn: .taskRoleArn,
-          networkMode: .networkMode,
-          requiresCompatibilities: .requiresCompatibilities,
-          cpu: .cpu,
-          memory: .memory
-        }' > new-task-def.json
+      - echo Replacing image in task definition...
+      - UPDATED_TASK=$(cat old-task-def.json | jq --arg IMAGE "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest" '.containerDefinitions[0].image=$IMAGE' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
 
-      - echo "🆕 New task definition JSON:"
-      - cat new-task-def.json
+      - echo Writing updated task definition to file...
+      - echo "$UPDATED_TASK" > new-task-def.json
 
-      - echo "📝 Registering new task definition revision..."
-      - |
-        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-          --cli-input-json file://new-task-def.json \
-          --query 'taskDefinition.taskDefinitionArn' \
-          --output text)
+      - echo Registering new task definition...
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --region ap-south-1 --query 'taskDefinition.taskDefinitionArn' --output text)
 
-        echo "✅ New task definition registered: $NEW_TASK_DEF_ARN"
+      - echo Updating ECS service...
+      - aws ecs update-service --cluster sree-cluster --service sree-service --task-definition "$TASK_DEF_ARN" --force-new-deployment --region ap-south-1
 
-      - echo "🔄 Updating ECS service..."
-      - |
-        aws ecs update-service \
-          --cluster sree-cluster \
-          --service sree-service \
-          --task-definition "$NEW_TASK_DEF_ARN" \
-          --force-new-deployment
 artifacts:
   files:
     - new-task-def.json
