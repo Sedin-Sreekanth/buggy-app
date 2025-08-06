@@ -1,0 +1,111 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:ap-south-1:156916773321:task-definition/sree-ci-cd:74",
+    "containerDefinitions": [
+        {
+            "name": "exp-code-pipeline",
+            "image": "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest",
+            "cpu": 512,
+            "memory": 512,
+            "portMappings": [
+                {
+                    "name": "exp-code-pipeline-3000-tcp",
+                    "containerPort": 3000,
+                    "hostPort": 3000,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "MYSQL_DATABASE",
+                    "value": ""
+                },
+                {
+                    "name": "MYSQL_PORT",
+                    "value": ""
+                },
+                {
+                    "name": "RAILS_ENV",
+                    "value": ""
+                },
+                {
+                    "name": "MYSQL_ROOT_PASSWORD",
+                    "value": ""
+                },
+                {
+                    "name": "MYSQL_USER",
+                    "value": ""
+                },
+                {
+                    "name": "MYSQL_HOST",
+                    "value": "s"
+                },
+                {
+                    "name": "SECRET_KEY_BASE",
+                    "value": ""
+                }
+            ],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/sree-ci-cd",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "ap-south-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "sree-ci-cd",
+    "taskRoleArn": "arn:aws:iam::156916773321:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::156916773321:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 74,
+    "volumes": [],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2"
+    ],
+    "requiresCompatibilities": [
+        "EC2"
+    ],
+    "cpu": "512",
+    "memory": "512",
+    "registeredAt": "2025-08-06T04:52:43.640Z",
+    "registeredBy": "arn:aws:sts::156916773321:assumed-role/codebuild-sree-project-service-role/AWSCodeBuild-fe837aaf-6174-4282-8085-0fe7bd30273d",
+    "tags": []
+}
