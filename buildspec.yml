@@ -1,37 +1,46 @@
 version: 0.2
 
+env:
+  variables:
+    AWS_REGION: "ap-south-1"
+    ECR_ACCOUNT_ID: "156916773321"
+    REPO_NAME: "sree-buggy"
+    ECR_URI: "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy"
+    CLUSTER_NAME: "sree-cluster"
+    SERVICE_NAME: "sree-service"
+    TASK_FAMILY: "sree-ci-cd"
+
 phases:
   pre_build:
     commands:
       - echo Logging into ECR...
-      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 156916773321.dkr.ecr.ap-south-1.amazonaws.com
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${ECR_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
   build:
     commands:
       - echo Building Docker image...
-      - docker build -t 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest .
+      - docker build -t $ECR_URI:latest .
       - echo Docker image built.
 
   post_build:
     commands:
       - echo Pushing image to ECR...
-      - docker push 156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest
+      - docker push $ECR_URI:latest
 
       - echo Fetching latest task definition revision...
-      - TASK_FAMILY="sree-ci-cd"
-      - aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --region ap-south-1 --query "taskDefinition" --output json > old-task-def.json
+      - aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --region $AWS_REGION --query "taskDefinition" --output json > old-task-def.json
 
       - echo Replacing image in task definition...
-      - UPDATED_TASK=$(cat old-task-def.json | jq --arg IMAGE "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy:latest" '.containerDefinitions[0].image=$IMAGE' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+      - UPDATED_TASK=$(cat old-task-def.json | jq --arg IMAGE "$ECR_URI:latest" '.containerDefinitions[0].image=$IMAGE' | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
 
       - echo Writing updated task definition to file...
       - echo "$UPDATED_TASK" > new-task-def.json
 
       - echo Registering new task definition...
-      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --region ap-south-1 --query 'taskDefinition.taskDefinitionArn' --output text)
+      - TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
 
       - echo Updating ECS service...
-      - aws ecs update-service --cluster sree-cluster --service sree-service --task-definition "$TASK_DEF_ARN" --force-new-deployment --region ap-south-1
+      - aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --task-definition "$TASK_DEF_ARN" --force-new-deployment --region $AWS_REGION
 
 artifacts:
   files:
