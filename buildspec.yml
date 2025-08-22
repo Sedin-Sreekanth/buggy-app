@@ -6,9 +6,9 @@ env:
     ECR_ACCOUNT_ID: "156916773321"
     REPO_NAME: "sree-buggy"
     ECR_URI: "156916773321.dkr.ecr.ap-south-1.amazonaws.com/sree-buggy"
-    CLUSTER_NAME: "sree-cluster"
-    SERVICE_NAME: "sree-service"
-    TASK_FAMILY: "sree-ci-cd"
+    CLUSTER_NAME: "sreeterra_ecs_cluster"
+    SERVICE_NAME: "sreeterra-service"
+    TASK_FAMILY: "sreeterra-task"
 
 phases:
   pre_build:
